@@ -104,6 +104,12 @@ h2,h3,p{margin:0}
 .ck-how{font-size:14px;color:var(--muted)}
 .ck-status{font-size:15px;font-weight:600;padding:9px 11px;border-radius:10px;background:var(--tint)}
 .ck-status.good{background:var(--good);color:#fff}
+.ck-row{display:flex;gap:8px;flex-wrap:wrap}
+.ck-row .btn{flex:1 1 150px}
+.freebtn{flex:1 1 150px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;min-height:52px;border:0;border-left:6px solid var(--shutter);border-radius:6px;background:var(--bg);box-shadow:inset 0 0 0 2px var(--line);font-family:var(--font-display);font-size:20px;letter-spacing:.05em;padding:6px 10px}
+.freebtn small{font-family:var(--font-body);font-weight:600;font-size:11.5px;letter-spacing:0;color:var(--muted)}
+.freebtn[aria-pressed="true"]{background:var(--shutter);color:var(--shutter-ink);box-shadow:inset 0 0 0 3px var(--ink)}
+.freebtn[aria-pressed="true"] small{color:inherit;opacity:.92}
 .ck-status.bad{background:var(--bad);color:#fff}
 
 /* board */
@@ -323,7 +329,7 @@ function clean(s){
 function load(){try{var raw=localStorage.getItem(KEY);return raw?clean(JSON.parse(raw)):fresh();}catch(e){storageOK=false;return fresh();}}
 function save(){state.savedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(state));storageOK=true;}catch(e){storageOK=false;}}
 var state=load();
-var ui={sheet:null,running:false,nextAt:0,hold:false,claimed:[],fix:false,lastTap:0,vi:0,confirm:null,pick:null,newWins:[],card:null,nameDraft:'',freshCall:false};
+var ui={sheet:null,running:false,nextAt:0,hold:false,claimed:[],free:false,fix:false,lastTap:0,vi:0,confirm:null,pick:null,newWins:[],card:null,nameDraft:'',freshCall:false};
 
 function patternOf(pid){
   for(var i=0;i<PATTERNS.length;i++)if(PATTERNS[i].id===pid)return PATTERNS[i];
@@ -402,18 +408,22 @@ function tally(){
 
 /* ---------- checking a bingo ---------- */
 function sig(v){var k=[0,0,0,0,0];v.forEach(function(i){if(i!==12)k[i%5]++;});return k;}
+function allUseFree(){var g=state.game;return variantsOf(g.pid,g.crazy).every(function(v){return v.indexOf(12)>=0;});}
 function tapStatus(){
   var g=state.game,cl=ui.claimed,last=lastOf(g.called),seen={};
   g.called.forEach(function(n){seen[n]=1;});
   var vs=variantsOf(g.pid,g.crazy);
   var needTxt='';
-  if(vs.length===1){var parts=[];sig(vs[0]).forEach(function(k,c){if(k)parts.push(k+' under '+LET[c]);});needTxt='This pattern needs '+parts.join(', ')+'.';}
-  if(!cl.length)return {cls:'',html:'Nothing tapped yet. '+needTxt};
+  if(vs.length===1){var parts=[];sig(vs[0]).forEach(function(k,c){if(k)parts.push(k+' under '+LET[c]);});if(vs[0].indexOf(12)>=0)parts.push('the free space');needTxt='This pattern needs '+parts.join(', ')+'.';}
+  if(!cl.length)return {cls:'',html:'No numbers tapped yet. '+needTxt};
   var bad=cl.filter(function(n){return !seen[n];});
   if(bad.length)return {cls:'bad',html:bad.map(lab).join(', ')+(bad.length>1?' were':' was')+' not called.'};
   var mine=[0,0,0,0,0];cl.forEach(function(n){mine[colOf(n)]++;});
-  var fits=vs.some(function(v){return sig(v).join()===mine.join();});
-  if(fits)return {cls:'good',html:(cl.length===1?'It was':'All '+cl.length+' were')+' called and the letters fit the pattern. The last call ('+lab(last)+') is '+(cl.indexOf(last)>=0?'':'not ')+'one of them.'};
+  var key=mine.join(),withFree=false,without=false;
+  vs.forEach(function(v){if(sig(v).join()===key){if(v.indexOf(12)>=0)withFree=true;else without=true;}});
+  if(ui.free?withFree:without)return {cls:'good',html:(cl.length===1?'The number was':'All '+cl.length+' numbers were')+' called'+(ui.free?', the free space counts,':'')+' and the letters fit the pattern. The last call ('+lab(last)+') is '+(cl.indexOf(last)>=0?'':'not ')+'one of them.'};
+  if(withFree&&!ui.free)return {cls:'',html:cl.length+' tapped, all called. Tap FREE if this bingo runs through the free space.'};
+  if(without&&ui.free)return {cls:'',html:cl.length+' tapped, all called. These letters make the pattern without the free space, so tap FREE again to take it out.'};
   return {cls:'',html:cl.length+' tapped, all called. '+(needTxt||'The letters do not make this pattern yet.')};
 }
 function evalCard(rows){
@@ -501,9 +511,10 @@ function renderPanel(){
   if(ui.hold){
     var st=tapStatus();
     el.innerHTML='<div class="check"><div class="ck-head"><b>Checking a bingo</b><span>'+esc(pname())+', last call <strong>'+lab(last)+'</strong></span></div>'+
-      '<p class="ck-how">Tap each number the player reads back'+(canPhoto?', or photograph the card.':'.')+' The free space always counts.</p>'+
-      '<div class="ck-status '+st.cls+'">'+st.html+'</div>'+
-      (canPhoto?'<button class="btn line" data-act="photo">Photograph the card</button>':'')+'</div>';
+      '<p class="ck-how">Tap each number the player reads back, and FREE if the bingo uses the free space'+(canPhoto?'. Or photograph the card.':'.')+'</p>'+
+      '<div class="ck-row"><button class="freebtn" data-act="free" aria-pressed="'+(ui.free?'true':'false')+'"><span>FREE'+(ui.free?' \u2713':'')+'</span><small>'+(ui.free?'Counted in this bingo':'Tap if the bingo uses it')+'</small></button>'+
+      (canPhoto?'<button class="btn line" data-act="photo">Photograph the card</button>':'')+'</div>'+
+      '<div class="ck-status '+st.cls+'">'+st.html+'</div></div>';
     return;
   }
   if(ui.fix){
@@ -701,7 +712,7 @@ function act(a,b){
     save();render();break;
   case 'hold':
     if(!g.called.length){toast('No numbers have been called yet.');return;}
-    ui.hold=true;ui.running=false;ui.claimed=[];ui.card=null;render();
+    ui.hold=true;ui.running=false;ui.claimed=[];ui.free=allUseFree();ui.card=null;render();
     var m=$('#main');if(m)m.scrollTop=0;
     break;
   case 'nobingo':
@@ -709,6 +720,7 @@ function act(a,b){
     if(ui.sheet)closeSheet();else render();
     if(state.mode!=='manual')toast('No bingo. Calling stays paused until you resume.');
     break;
+  case 'free':ui.free=!ui.free;renderPanel();break;
   case 'good':ui.newWins=[];ui.nameDraft='';openSheet('winner');break;
   case 'addwin':var el=$('#winner-name');addWin(el?el.value:'');renderSheet();break;
   case 'addname':addWin(b.dataset.name);renderSheet();break;
