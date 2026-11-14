@@ -408,6 +408,7 @@ function tally(){
 
 /* ---------- checking a bingo ---------- */
 function sig(v){var k=[0,0,0,0,0];v.forEach(function(i){if(i!==12)k[i%5]++;});return k;}
+function anyUseFree(){var g=state.game;return variantsOf(g.pid,g.crazy).some(function(v){return v.indexOf(12)>=0;});}
 function allUseFree(){var g=state.game;return variantsOf(g.pid,g.crazy).every(function(v){return v.indexOf(12)>=0;});}
 function tapStatus(){
   var g=state.game,cl=ui.claimed,last=lastOf(g.called),seen={};
@@ -509,11 +510,14 @@ function renderPanel(){
   var g=state.game,el=$('#panel'),last=lastOf(g.called);
   $('#boardwrap').className=(ui.hold||ui.fix)?'tall':'';
   if(ui.hold){
+    var useFree=anyUseFree();
+    if(!useFree)ui.free=false;
     var st=tapStatus();
     el.innerHTML='<div class="check"><div class="ck-head"><b>Checking a bingo</b><span>'+esc(pname())+', last call <strong>'+lab(last)+'</strong></span></div>'+
-      '<p class="ck-how">Tap each number the player reads back, and FREE if the bingo uses the free space'+(canPhoto?'. Or photograph the card.':'.')+'</p>'+
-      '<div class="ck-row"><button class="freebtn" data-act="free" aria-pressed="'+(ui.free?'true':'false')+'"><span>FREE'+(ui.free?' \u2713':'')+'</span><small>'+(ui.free?'Counted in this bingo':'Tap if the bingo uses it')+'</small></button>'+
-      (canPhoto?'<button class="btn line" data-act="photo">Photograph the card</button>':'')+'</div>'+
+      '<p class="ck-how">Tap each number the player reads back'+(useFree?', and FREE if the bingo uses the free space':'')+(canPhoto?'. Or photograph the card.':'.')+'</p>'+
+      (useFree||canPhoto?'<div class="ck-row">'+
+        (useFree?'<button class="freebtn" data-act="free" aria-pressed="'+(ui.free?'true':'false')+'"><span>FREE'+(ui.free?' \u2713':'')+'</span><small>'+(ui.free?'Counted in this bingo':'Tap if the bingo uses it')+'</small></button>':'')+
+        (canPhoto?'<button class="btn line" data-act="photo">Photograph the card</button>':'')+'</div>':'')+
       '<div class="ck-status '+st.cls+'">'+st.html+'</div></div>';
     return;
   }
