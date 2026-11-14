@@ -90,9 +90,9 @@ h2,h3,p{margin:0}
 .none{font-size:14px;color:var(--muted)}
 .status{font-size:13.5px;color:var(--muted);min-height:18px}
 .status b{color:var(--ink)}
-.seg{display:grid;grid-template-columns:repeat(3,1fr);background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:3px;gap:3px;margin-top:8px}
-.seg button{border:0;background:transparent;border-radius:9px;padding:9px 4px;font-weight:700;font-size:14.5px;min-height:40px}
-.seg button small{font-weight:600;opacity:.75;font-size:12px;margin-left:3px}
+.seg{display:grid;grid-template-columns:repeat(4,1fr);background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:3px;gap:3px;margin-top:8px}
+.seg button{border:0;background:transparent;border-radius:9px;padding:6px 2px;font-weight:700;font-size:14px;min-height:44px;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.15}
+.seg button small{font-weight:600;opacity:.75;font-size:11.5px}
 .seg button[aria-pressed="true"]{background:var(--primary);color:var(--primary-ink)}
 
 /* check and fix panels */
@@ -227,7 +227,8 @@ input[type="text"],input[type="number"]{font:inherit;font-size:17px;color:var(--
   .pb{width:58px;height:58px;font-size:24px}
   .pb i{font-size:13px}
   .status{font-size:16px}
-  .seg button{font-size:16px;min-height:48px}
+  .seg button{font-size:16px;min-height:52px}
+  .seg button small{font-size:12.5px}
   .btn{min-height:66px;font-size:19px}
   .btn.bingo{font-size:26px}
 }
@@ -311,7 +312,7 @@ function rot(v){return v.map(function(i){var r=Math.floor(i/5),c=i%5;return c*5+
 /* ---------- saved state ---------- */
 var KEY='bingo-caller-v1';
 var storageOK=true;
-function fresh(){return {v:1,game:{no:1,pid:'line',crazy:false,called:[]},wins:[],history:[],customs:[],mode:'manual',set:{voice:false,normal:10,speed:3,skip:true},savedAt:0};}
+function fresh(){return {v:1,game:{no:1,pid:'line',crazy:false,called:[]},wins:[],history:[],customs:[],mode:'manual',set:{voice:false,normal:10,speed:3,lightning:1.5,skip:true},savedAt:0};}
 function clean(s){
   var f=fresh();
   if(!s||s.v!==1||!s.game)return f;
@@ -321,8 +322,8 @@ function clean(s){
   f.wins=Array.isArray(s.wins)?s.wins.filter(function(w){return w&&w.id&&typeof w.name==='string';}):[];
   f.history=Array.isArray(s.history)?s.history.filter(function(h){return h&&Array.isArray(h.called);}):[];
   f.customs=Array.isArray(s.customs)?s.customs.filter(function(c){return c&&c.id&&Array.isArray(c.v)&&Array.isArray(c.v[0]);}):[];
-  f.mode=['manual','normal','speed'].indexOf(s.mode)>=0?s.mode:'manual';
-  if(s.set){f.set.voice=!!s.set.voice;f.set.skip=s.set.skip!==false;if(+s.set.normal>=5&&+s.set.normal<=30)f.set.normal=+s.set.normal;if(+s.set.speed>=2&&+s.set.speed<=8)f.set.speed=+s.set.speed;}
+  f.mode=['manual','normal','speed','lightning'].indexOf(s.mode)>=0?s.mode:'manual';
+  if(s.set){f.set.voice=!!s.set.voice;f.set.skip=s.set.skip!==false;if(+s.set.normal>=5&&+s.set.normal<=30)f.set.normal=+s.set.normal;if(+s.set.speed>=2&&+s.set.speed<=8)f.set.speed=+s.set.speed;if(+s.set.lightning>=1&&+s.set.lightning<=2.5)f.set.lightning=+s.set.lightning;}
   f.savedAt=+s.savedAt||0;
   return f;
 }
@@ -351,7 +352,7 @@ function usedCols(pid,crazy){var s={};variantsOf(pid,crazy).forEach(function(v){
 function colsInPlay(){var g=state.game;return state.set.skip?usedCols(g.pid,g.crazy):{0:1,1:1,2:1,3:1,4:1};}
 function pool(){var cs=colsInPlay(),seen={},out=[];state.game.called.forEach(function(n){seen[n]=1;});for(var n=1;n<=75;n++)if(!seen[n]&&cs[colOf(n)])out.push(n);return out;}
 function gameWins(no){return state.wins.filter(function(w){return w.game===no;});}
-function secs(){return state.mode==='speed'?state.set.speed:state.set.normal;}
+function secs(){return state.mode==='lightning'?state.set.lightning:state.mode==='speed'?state.set.speed:state.set.normal;}
 
 /* ---------- voice and screen ---------- */
 var canSpeak=('speechSynthesis' in window)&&(typeof SpeechSynthesisUtterance!=='undefined');
@@ -359,7 +360,7 @@ function speakText(t,rate){
   if(!canSpeak)return;
   try{var ss=window.speechSynthesis;if(ss.speaking||ss.pending)ss.cancel();var u=new SpeechSynthesisUtterance(t);u.lang='en-US';u.rate=rate||0.92;ss.speak(u);}catch(e){}
 }
-function speak(n){if(state.set.voice)speakText(letterOf(n)+', '+n,state.mode==='speed'?1.1:0.9);}
+function speak(n){if(state.set.voice)speakText(letterOf(n)+', '+n,state.mode==='lightning'?1.3:state.mode==='speed'?1.1:0.9);}
 var lock=null;
 function wake(){
   if(lock||!navigator.wakeLock)return;
@@ -532,7 +533,7 @@ function renderPanel(){
     (prev.length?prev.map(function(n){return '<span class="pb"><i>'+letterOf(n)+'</i>'+n+'</span>';}).join(''):'<span class="none">None yet</span>')+
     '</div><div class="status">'+statusLine()+'</div></div></div>'+
     '<div class="seg" role="group" aria-label="Calling pace">';
-  [['manual','Manual',''],['normal','Normal',state.set.normal+'s'],['speed','Speed',state.set.speed+'s']].forEach(function(m){
+  [['manual','Manual','by hand'],['normal','Normal',state.set.normal+'s'],['speed','Speed',state.set.speed+'s'],['lightning','Lightning',state.set.lightning+'s']].forEach(function(m){
     h+='<button data-act="mode" data-mode="'+m[0]+'" aria-pressed="'+(state.mode===m[0])+'">'+m[1]+(m[2]?'<small>'+m[2]+'</small>':'')+'</button>';
   });
   el.innerHTML=h+'</div>';
@@ -592,7 +593,7 @@ function shMenu(){
     '</div><h3>Settings</h3><div class="list">';
   if(canSpeak)h+=sw('toggle','voice','Call numbers out loud','Test it before the game starts',state.set.voice);
   h+=sw('toggle','skip','Skip letters the pattern does not use','No N calls during a Letter X',state.set.skip);
-  h+=pace('normal','Normal pace')+pace('speed','Speed pace')+'</div>';
+  h+=pace('normal','Normal pace')+pace('speed','Speed pace')+pace('lightning','Lightning pace')+'</div>';
   if(!storageOK)h+='<p class="warn">This device is not saving the game, so keep this page open until you finish.</p>';
   h+='<button class="row danger" data-act="wipe"><span>'+(ui.confirm==='wipe'?'Tap again to clear every win and game':'Start a fresh night')+'</span><small>Clears all wins and past games</small></button>';
   return wrap('Menu',h);
@@ -766,6 +767,7 @@ function act(a,b){
   case 'pace':
     k=b.dataset.k;var d=+b.dataset.d;
     if(k==='normal')state.set.normal=Math.min(30,Math.max(5,state.set.normal+d));
+    else if(k==='lightning')state.set.lightning=Math.min(2.5,Math.max(1,state.set.lightning+d*0.5));
     else state.set.speed=Math.min(8,Math.max(2,state.set.speed+d*0.5));
     save();renderSheet();break;
   case 'wipe':
@@ -818,7 +820,7 @@ setInterval(function(){
   if(state.mode==='manual'||ui.hold||ui.fix||ui.sheet){ui.running=false;renderBar();return;}
   if(Date.now()>=ui.nextAt){if(callNext()){ui.nextAt=Date.now()+secs()*1000;renderBar();}return;}
   var s=$('#gosub');if(s)s.textContent=countdown();
-},200);
+},100);
 var calm=false;try{calm=window.matchMedia('(prefers-reduced-motion: reduce)').matches;}catch(e){}
 setInterval(function(){
   if(calm||ui.sheet)return;
